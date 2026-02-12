@@ -121,23 +121,27 @@
     </div>
 
     <script>
-        // *** CONFIGURATION: PASTE YOUR KEYS HERE ***
+        // *** 1. CONFIGURATION ***
         const SUPABASE_URL = 'https://quzuzlbanupjrmrctgrg.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_otFn4uvQRKLrH3SfHFYNTA_WbLSnzbj';
         
-        // Initialize Supabase
+        // Initialize Supabase ONLY ONCE
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // *** AUTHENTICATION ***
+        // *** 2. AUTHENTICATION ***
         async function handleLogin() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
+            // Show some feedback that we are trying to log in
+            const errorEl = document.getElementById('error-msg');
+            errorEl.classList.add('hidden');
+
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
             if (error) {
-                document.getElementById('error-msg').innerText = error.message;
-                document.getElementById('error-msg').classList.remove('hidden');
+                errorEl.innerText = error.message;
+                errorEl.classList.remove('hidden');
             } else {
                 document.getElementById('login-overlay').style.display = 'none';
                 document.getElementById('dashboard').classList.remove('hidden');
@@ -150,9 +154,10 @@
             location.reload();
         }
 
-        // *** DATABASE FUNCTIONS ***
+        // *** 3. DATABASE FUNCTIONS ***
         async function saveProduct() {
             const btn = document.getElementById('save-btn');
+            const originalText = btn.innerText;
             btn.innerText = "Uploading...";
             
             const name = document.getElementById('p-name').value;
@@ -162,7 +167,11 @@
             const image_url = document.getElementById('p-img').value;
             const description = document.getElementById('p-desc').value;
 
-            if(!name || !price) { alert("Name and Price are required"); btn.innerText = "Upload to Database"; return; }
+            if(!name || !price) { 
+                alert("Name and Price are required"); 
+                btn.innerText = originalText; 
+                return; 
+            }
 
             const { data, error } = await supabase
                 .from('products')
@@ -177,9 +186,9 @@
                 document.getElementById('p-name').value = "";
                 document.getElementById('p-price').value = "";
                 document.getElementById('p-img').value = "";
-                loadProducts(); // Refresh list
+                loadProducts(); 
             }
-            btn.innerText = "Upload to Database";
+            btn.innerText = originalText;
         }
 
         async function loadProducts() {
@@ -196,7 +205,7 @@
                 return;
             }
 
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 list.innerHTML = '<p class="text-sm text-gray-400 italic">No products in database.</p>';
                 return;
             }
@@ -228,24 +237,27 @@
             }
         }
 
-        // Preview Helper
+        // *** 4. HELPERS ***
         function updatePreview() {
-            document.getElementById('prev-name').innerText = document.getElementById('p-name').value || "Name";
+            document.getElementById('prev-name').innerText = document.getElementById('p-name').value || "Product Name";
             document.getElementById('prev-price').innerText = document.getElementById('p-price').value || "₱0.00";
             document.getElementById('prev-cat').innerText = document.getElementById('p-cat').value;
             const img = document.getElementById('p-img').value;
             if(img) document.getElementById('prev-img').src = img;
         }
 
-        // Check session on load
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                document.getElementById('login-overlay').style.display = 'none';
-                document.getElementById('dashboard').classList.remove('hidden');
-                loadProducts();
-            }
-        });
+        // Check for existing session when page loads
+        window.onload = function() {
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                if (session) {
+                    document.getElementById('login-overlay').style.display = 'none';
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    loadProducts();
+                }
+            });
+        };
     </script>
 </body>
 
 </html>
+
