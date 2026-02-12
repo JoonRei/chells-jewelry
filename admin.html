@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chell's | Cloud Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;700&display=swap');
+        body { font-family: 'Manrope', sans-serif; background-color: #F3F4F6; color: #111; }
+        
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; z-index: 1000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        
+        .input-group label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.05em; color: #6B7280; }
+        .input-group input, .input-group textarea, .input-group select {
+            width: 100%; padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px;
+            font-size: 0.9rem; outline: none; transition: border-color 0.2s; background: #fff;
+        }
+        .input-group input:focus, .input-group textarea:focus, .input-group select:focus { border-color: #111; }
+        
+        .preview-card {
+            background: white; border-radius: 20px; padding: 10px;
+            border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="login-overlay">
+        <h1 class="text-white text-3xl font-light mb-8 tracking-tighter">CHELL'S <span class="font-bold">CLOUD</span></h1>
+        <div class="w-full max-w-xs space-y-4">
+            <input type="email" id="email" placeholder="Admin Email" class="w-full p-3 rounded-lg bg-gray-900 border border-gray-800 text-white focus:border-white outline-none transition">
+            <input type="password" id="password" placeholder="Password" class="w-full p-3 rounded-lg bg-gray-900 border border-gray-800 text-white focus:border-white outline-none transition">
+            <button onclick="handleLogin()" class="w-full bg-white text-black font-bold py-3 rounded-lg uppercase tracking-widest text-xs hover:bg-gray-200 transition">Login</button>
+            <p id="error-msg" class="text-red-500 text-xs text-center hidden">Invalid Credentials</p>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden max-w-6xl mx-auto p-6 lg:p-12">
+        <header class="flex justify-between items-center mb-12">
+            <div>
+                <h1 class="text-3xl font-bold tracking-tight">Cloud Inventory</h1>
+                <p class="text-gray-500 text-sm">Manage products via Supabase.</p>
+            </div>
+            <button onclick="handleLogout()" class="text-xs font-bold uppercase tracking-widest hover:text-red-600 transition">Logout</button>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-12">
+            
+            <div class="lg:col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 h-fit">
+                <h2 class="text-lg font-bold mb-6">Add New Product</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="input-group">
+                        <label>Product Name</label>
+                        <input type="text" id="p-name" placeholder="e.g. Stardust Ring" oninput="updatePreview()">
+                    </div>
+                    <div class="input-group">
+                        <label>Price (PHP)</label>
+                        <input type="text" id="p-price" placeholder="e.g. ₱5,000" oninput="updatePreview()">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div class="input-group">
+                        <label>Category</label>
+                        <select id="p-cat" onchange="updatePreview()">
+                            <option value="rings">Rings</option>
+                            <option value="necklaces">Necklaces</option>
+                            <option value="earrings">Earrings</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Weight / Sizes</label>
+                        <input type="text" id="p-size" placeholder="e.g. 5g / Sizes 5-9" oninput="updatePreview()">
+                    </div>
+                </div>
+
+                <div class="input-group mb-6">
+                    <label>Image URL</label>
+                    <input type="text" id="p-img" placeholder="Paste image link here..." oninput="updatePreview()">
+                </div>
+
+                <div class="input-group mb-8">
+                    <label>Description</label>
+                    <textarea id="p-desc" rows="4" placeholder="Describe the product..." oninput="updatePreview()"></textarea>
+                </div>
+
+                <button id="save-btn" onclick="saveProduct()" class="w-full bg-black text-white font-bold py-4 rounded-xl uppercase tracking-widest text-xs hover:bg-gray-800 transition shadow-lg">
+                    Upload to Database
+                </button>
+            </div>
+
+            <div class="space-y-8">
+                <div class="preview-card">
+                    <div class="h-64 overflow-hidden rounded-xl bg-gray-100 mb-3">
+                        <img id="prev-img" src="" class="w-full h-full object-cover">
+                    </div>
+                    <div class="px-2 pb-2">
+                        <div id="prev-cat" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">CATEGORY</div>
+                        <div class="flex justify-between items-start">
+                            <h3 id="prev-name" class="font-bold text-gray-900">Product Name</h3>
+                            <span id="prev-price" class="font-medium">₱0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl border border-gray-100">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4">Database Items</h3>
+                    <div id="db-list" class="space-y-4 max-h-60 overflow-y-auto pr-2">
+                        <p class="text-sm text-gray-400 italic">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // *** CONFIGURATION: PASTE YOUR KEYS HERE ***
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL_HERE';
+        const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY_HERE';
+        
+        // Initialize Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // *** AUTHENTICATION ***
+        async function handleLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                document.getElementById('error-msg').innerText = error.message;
+                document.getElementById('error-msg').classList.remove('hidden');
+            } else {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('dashboard').classList.remove('hidden');
+                loadProducts();
+            }
+        }
+
+        async function handleLogout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        // *** DATABASE FUNCTIONS ***
+        async function saveProduct() {
+            const btn = document.getElementById('save-btn');
+            btn.innerText = "Uploading...";
+            
+            const name = document.getElementById('p-name').value;
+            const price = document.getElementById('p-price').value;
+            const category = document.getElementById('p-cat').value;
+            const specs = document.getElementById('p-size').value;
+            const image_url = document.getElementById('p-img').value;
+            const description = document.getElementById('p-desc').value;
+
+            if(!name || !price) { alert("Name and Price are required"); btn.innerText = "Upload to Database"; return; }
+
+            const { data, error } = await supabase
+                .from('products')
+                .insert([{ name, price, category, specs, image_url, description }])
+                .select();
+
+            if (error) {
+                alert("Error: " + error.message);
+            } else {
+                alert("Product Saved!");
+                // Clear form
+                document.getElementById('p-name').value = "";
+                document.getElementById('p-price').value = "";
+                document.getElementById('p-img').value = "";
+                loadProducts(); // Refresh list
+            }
+            btn.innerText = "Upload to Database";
+        }
+
+        async function loadProducts() {
+            const list = document.getElementById('db-list');
+            list.innerHTML = "Loading...";
+
+            const { data, error } = await supabase
+                .from('products')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                list.innerHTML = "Error loading products";
+                return;
+            }
+
+            if (data.length === 0) {
+                list.innerHTML = '<p class="text-sm text-gray-400 italic">No products in database.</p>';
+                return;
+            }
+
+            list.innerHTML = "";
+            data.forEach(p => {
+                list.innerHTML += `
+                    <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                        <div class="flex items-center gap-3">
+                            <img src="${p.image_url}" class="w-10 h-10 rounded-md object-cover bg-gray-200" onerror="this.src='https://via.placeholder.com/50'">
+                            <div>
+                                <div class="text-xs font-bold">${p.name}</div>
+                                <div class="text-[10px] text-gray-500">${p.price}</div>
+                            </div>
+                        </div>
+                        <button onclick="deleteProduct(${p.id})" class="text-red-400 hover:text-red-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        async function deleteProduct(id) {
+            if(confirm("Delete from database?")) {
+                const { error } = await supabase.from('products').delete().eq('id', id);
+                if(error) alert(error.message);
+                else loadProducts();
+            }
+        }
+
+        // Preview Helper
+        function updatePreview() {
+            document.getElementById('prev-name').innerText = document.getElementById('p-name').value || "Name";
+            document.getElementById('prev-price').innerText = document.getElementById('p-price').value || "₱0.00";
+            document.getElementById('prev-cat').innerText = document.getElementById('p-cat').value;
+            const img = document.getElementById('p-img').value;
+            if(img) document.getElementById('prev-img').src = img;
+        }
+
+        // Check session on load
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('dashboard').classList.remove('hidden');
+                loadProducts();
+            }
+        });
+    </script>
+</body>
+</html>
